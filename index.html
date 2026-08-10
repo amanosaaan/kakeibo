@@ -501,7 +501,7 @@
           <label>対象期間:
             <select id="settlementPeriod" onchange="renderSettlement()">
               <option value="all">全期間</option>
-              <option value="month">対象月のみ</option>
+              <option value="month" selected>対象月のみ</option>
             </select>
           </label>
           <label>負担割合　瑞穂:
@@ -793,8 +793,16 @@
     }
 
     function monthKey(dateStr) {
-      const norm = String(dateStr).replace(/\//g, '-');
-      return norm.slice(0, 7);
+      const s = String(dateStr);
+      const m = s.match(/(\d{4})[-\/](\d{1,2})/);
+      if (m) {
+        return `${m[1]}-${String(m[2]).padStart(2, '0')}`;
+      }
+      const d = new Date(s);
+      if (!isNaN(d.getTime())) {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      }
+      return s.slice(0, 7);
     }
 
     function populateMonthSelect() {
@@ -872,7 +880,13 @@
           maintainAspectRatio: false,
           layout: { padding: { top: 24 } },
           scales: {
-            x: { stacked: true },
+            x: {
+              stacked: true,
+              type: 'category',
+              ticks: {
+                callback: function (value, index) { return months[index]; }
+              }
+            },
             y: { stacked: true, beginAtZero: true, suggestedMax: maxTotal * 1.15 }
           }
         },
