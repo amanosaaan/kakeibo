@@ -547,6 +547,7 @@
     let trendChart, monthPieChart;
     let monthPieSelected = new Set();
     let monthPieDataMap = {};
+    let trendPeriodInitialized = false;
 
     const CATEGORIES = [
       "1.家賃", "2.食費", "3.食費(外食)", "4.日用品", "5.水道光熱費",
@@ -811,6 +812,12 @@
           if (res.status !== "OK") throw new Error(res.message || "unknown error");
           allEntries = res.entries || [];
           reportStatus.textContent = `${allEntries.length}件のデータを読み込みました`;
+          if (!trendPeriodInitialized) {
+            trendPeriodInitialized = true;
+            if (window.innerWidth <= 640) {
+              document.getElementById('trendPeriod').value = '6';
+            }
+          }
           populateMonthSelect();
           try { renderTrendChart(); } catch (e) { console.error("trend chart error", e); }
           try { renderMonthPie(); } catch (e) { console.error("month pie error", e); }
