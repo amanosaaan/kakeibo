@@ -385,6 +385,23 @@
       color: var(--teal-dark);
     }
 
+    #monthPieSelectedSum {
+      display: none;
+      margin-top: 0.75rem;
+      padding: 0.65rem 1rem;
+      background: var(--teal-soft);
+      border-radius: var(--radius-md);
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: var(--ink);
+    }
+
+    #monthPieSelectedSum.active { display: block; }
+
+    #monthPieSelectedSum strong {
+      color: var(--teal-dark);
+    }
+
     .totals-row {
       display: flex;
       flex-wrap: wrap;
@@ -492,7 +509,10 @@
             <select id="monthSelect" onchange="renderMonthPie()"></select>
           </label>
         </div>
+        <div class="totals-row" id="monthPieTotalsRow"></div>
         <div class="chart-wrap"><canvas id="monthPieChart"></canvas></div>
+        <div id="monthPieSelectedSum"></div>
+        <div id="monthPieHint" style="margin-top:0.5rem; font-size:0.78rem; color: var(--ink-muted);">Shift/Ctrlを押しながら凡例やグラフを選択すると、選んだ項目の合計を表示します</div>
       </div>
 
       <div class="card">
@@ -525,6 +545,8 @@
     let manualStop = false;
     let allEntries = [];
     let trendChart, monthPieChart;
+    let monthPieSelected = new Set();
+    let monthPieDataMap = {};
 
     const CATEGORIES = [
       "1.家賃", "2.食費", "3.食費(外食)", "4.日用品", "5.水道光熱費",
@@ -652,6 +674,13 @@
     function deleteRow(button) {
       const row = button.closest("tr");
       row.remove();
+    }
+
+    function formatManYen(amount) {
+      const man = amount / 10000;
+      const rounded = Math.round(man * 10) / 10;
+      const str = Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+      return str + '万円';
     }
 
     function formatDateISO(date) {
@@ -853,6 +882,7 @@
           const meta0 = chart.getDatasetMeta(0);
           if (!meta0 || !meta0.data || meta0.data.length === 0) return;
           const { ctx, scales } = chart;
+          const isNarrow = window.innerWidth <= 640;
           months.forEach((m, index) => {
             const total = monthTotals[index];
             if (total <= 0) return;
@@ -860,12 +890,13 @@
             if (!bar) return;
             const x = bar.x;
             const y = scales.y.getPixelForValue(total);
+            const label = isNarrow ? formatManYen(total) : (total.toLocaleString() + '円');
             ctx.save();
             ctx.font = '12px "Noto Sans JP", sans-serif';
             ctx.fillStyle = '#1E2A32';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'bottom';
-            ctx.fillText(total.toLocaleString() + '円', x, y - 4);
+            ctx.fillText(label, x, y - 4);
             ctx.restore();
           });
         }
@@ -904,20 +935,86 @@
       const labels = [];
       const data = [];
       const colors = [];
+      monthPieDataMap = {};
       CATEGORIES.forEach((cat, i) => {
         if (totalsByCategory[i] > 0) {
-          labels.push(cat.replace(/^\d+\./, ""));
+          const label = cat.replace(/^\d+\./, "");
+          labels.push(label);
           data.push(totalsByCategory[i]);
           colors.push(CATEGORY_COLORS[i]);
+          monthPieDataMap[label] = totalsByCategory[i];
         }
       });
+
+      const monthTotal = data.reduce((sum, v) => sum + v, 0);
+      document.getElementById("monthPieTotalsRow").innerHTML =
+        `<div>合計<br><strong>${monthTotal.toLocaleString()}円</strong></div>`;
+
+      monthPieSelected = new Set();
+      updateMonthPieSelectedSum();
 
       if (monthPieChart) monthPieChart.destroy();
       monthPieChart = new Chart(document.getElementById("monthPieChart"), {
         type: 'doughnut',
         data: { labels, datasets: [{ data, backgroundColor: colors }] },
-        options: { responsive: true, maintainAspectRatio: false }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          onClick: (evt, elements, chart) => {
+            if (!elements.length) return;
+            const idx = elements[0].index;
+            const label = chart.data.labels[idx];
+            const additive = !!(evt.native && (evt.native.shiftKey || evt.native.ctrlKey || evt.native.metaKey));
+            togglePieSelection(label, additive);
+          },
+          plugins: {
+            legend: {
+              onClick: (evt, legendItem, legend) => {
+                const additive = !!(evt.native && (evt.native.shiftKey || evt.native.ctrlKey || evt.native.metaKey));
+                if (additive) {
+                  togglePieSelection(legendItem.text, true);
+                } else {
+                  const chart = legend.chart;
+                  chart.toggleDataVisibility(legendItem.index);
+                  chart.update();
+                }
+              }
+            }
+          }
+        }
       });
+    }
+
+    function togglePieSelection(label, additive) {
+      if (!additive) {
+        if (monthPieSelected.size === 1 && monthPieSelected.has(label)) {
+          monthPieSelected.clear();
+        } else {
+          monthPieSelected = new Set([label]);
+        }
+      } else {
+        if (monthPieSelected.has(label)) {
+          monthPieSelected.delete(label);
+        } else {
+          monthPieSelected.add(label);
+        }
+      }
+      updateMonthPieSelectedSum();
+    }
+
+    function updateMonthPieSelectedSum() {
+      const el = document.getElementById("monthPieSelectedSum");
+      if (!el) return;
+      if (monthPieSelected.size === 0) {
+        el.classList.remove("active");
+        el.innerHTML = "";
+        return;
+      }
+      let sum = 0;
+      monthPieSelected.forEach(label => { sum += monthPieDataMap[label] || 0; });
+      const names = Array.from(monthPieSelected).join("、");
+      el.classList.add("active");
+      el.innerHTML = `選択中（${names}）の合計: <strong>${sum.toLocaleString()}円</strong>`;
     }
 
     function renderSettlement() {
