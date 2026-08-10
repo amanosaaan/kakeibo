@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>音声入力家計簿</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg: #F4F7F6;
+      --surface: #FFFFFF;
+      --ink: #1E2A32;
+      --ink-muted: #6B7B80;
+      --border: #E3E9E7;
+      --teal: #0E7C7B;
+      --teal-dark: #0A5F5E;
+      --teal-soft: #E1F1EF;
+      --coral: #E8734A;
+      --coral-soft: #FCE9E0;
+      --highlight: #FFF6D9;
+      --danger: #C2410C;
+      --radius-lg: 18px;
+      --radius-md: 12px;
+      --radius-sm: 8px;
+      --shadow: 0 2px 12px rgba(30, 42, 50, 0.07);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Noto Sans JP', 'Segoe UI', sans-serif;
+      background-color: var(--bg);
+      margin: 0;
+      padding: 0;
+      color: var(--ink);
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    h1, h2 {
+      font-family: 'Zen Maru Gothic', 'Noto Sans JP', sans-serif;
+    }
+
+    .amount, .num {
+      font-variant-numeric: tabular-nums;
+      font-feature-settings: "tnum";
+    }
+
+    /* ---------- ヘッダー ---------- */
+    #header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background-color: var(--surface);
+      padding: 1rem 1.25rem 0.75rem;
+      box-shadow: var(--shadow);
+    }
+
+    .header-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 700;
+      margin: 0;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    #status {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.3rem 0.7rem;
+      border-radius: 999px;
+    }
+
+    #status.listening {
+      background-color: var(--coral-soft);
+      color: var(--coral);
+    }
+
+    #status.stopped {
+      background-color: var(--border);
+      color: var(--ink-muted);
+    }
+
+    /* セグメント型タブ */
+    .tabs {
+      display: flex;
+      background: var(--bg);
+      border-radius: 999px;
+      padding: 4px;
+      gap: 4px;
+    }
+
+    .tab-button {
+      flex: 1;
+      background: none;
+      border: none;
+      border-radius: 999px;
+      padding: 0.55rem 1rem;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--ink-muted);
+      cursor: pointer;
+      font-family: inherit;
+    }
+
+    .tab-button.active {
+      background: var(--surface);
+      color: var(--teal-dark);
+      box-shadow: 0 1px 4px rgba(30,42,50,0.12);
+    }
+
+    /* ---------- ボタン共通 ---------- */
+    button {
+      font-family: inherit;
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: 0.95rem;
+      padding: 0.65rem 1rem;
+      min-height: 44px;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .btn-outline {
+      background: var(--surface);
+      color: var(--ink);
+      border: 1.5px solid var(--border);
+    }
+
+    .btn-outline:hover { background: var(--bg); }
+
+    .btn-primary {
+      background: var(--teal);
+      color: white;
+      font-weight: 700;
+      width: 100%;
+      padding: 0.9rem 1rem;
+      font-size: 1rem;
+      box-shadow: 0 2px 8px rgba(14,124,123,0.25);
+    }
+
+    .btn-primary:hover { background: var(--teal-dark); }
+
+    .btn-primary:disabled {
+      background: var(--border);
+      color: var(--ink-muted);
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    .btn-ghost {
+      background: none;
+      color: var(--ink-muted);
+      text-decoration: underline;
+      padding: 0.5rem 0.25rem;
+      font-size: 0.85rem;
+      min-height: auto;
+    }
+
+    .save-panel {
+      margin-top: 0.5rem;
+    }
+
+    .save-panel-footer {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 0.5rem;
+      flex-wrap: wrap;
+      gap: 0.4rem;
+    }
+
+    #saveStatus {
+      font-size: 0.85rem;
+      color: var(--teal-dark);
+      font-weight: 600;
+    }
+
+    #result {
+      margin: 0.75rem 0;
+      width: 100%;
+      height: 70px;
+      padding: 0.7rem;
+      font-size: 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-md);
+      background: repeating-linear-gradient(var(--surface), var(--surface) 27px, var(--border) 28px);
+      font-family: inherit;
+      resize: vertical;
+    }
+
+    #notice {
+      color: var(--ink-muted);
+      font-size: 0.85rem;
+      padding-bottom: 0.75rem;
+    }
+
+    #notice ul {
+      margin: 0;
+      padding-left: 1.1rem;
+      line-height: 1.7;
+    }
+
+    main {
+      padding: 1.25rem;
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .card {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow);
+      padding: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+
+    .card h2 {
+      margin: 0 0 0.9rem;
+      font-size: 1.05rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    /* ---------- 入力テーブル ---------- */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: var(--surface);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+
+    thead th {
+      background-color: var(--teal-soft);
+      color: var(--teal-dark);
+      font-weight: 700;
+      font-size: 0.85rem;
+      text-align: left;
+      padding: 0.7rem 0.9rem;
+    }
+
+    td {
+      padding: 0.7rem 0.9rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.9rem;
+    }
+
+    tbody tr:last-child td { border-bottom: none; }
+
+    td[contenteditable="true"] {
+      background-color: var(--highlight);
+    }
+
+    select {
+      width: 100%;
+      font-size: 0.85rem;
+      padding: 0.4rem;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--border);
+      background-color: var(--surface);
+      font-family: inherit;
+      color: var(--ink);
+    }
+
+    .delete-cell { width: 40px; text-align: center; }
+
+    .delete-button {
+      background: transparent;
+      border: none;
+      color: var(--coral);
+      font-size: 1.3rem;
+      cursor: pointer;
+      padding: 0;
+      min-height: auto;
+      line-height: 1;
+    }
+
+    /* モバイル: テーブル→カードリスト */
+    @media (max-width: 640px) {
+      #transcriptTable, #transcriptTable thead, #transcriptTable tbody,
+      #transcriptTable th, #transcriptTable td, #transcriptTable tr {
+        display: block;
+      }
+      #transcriptTable { background: none; box-shadow: none; }
+      #transcriptTable thead { display: none; }
+      #transcriptTable tbody tr {
+        background: var(--surface);
+        border-radius: var(--radius-md);
+        box-shadow: var(--shadow);
+        margin-bottom: 0.75rem;
+        padding: 0.2rem 1rem;
+      }
+      #transcriptTable td {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        border-bottom: 1px solid var(--border);
+        padding: 0.6rem 0;
+      }
+      #transcriptTable tr td:last-child { border-bottom: none; }
+      #transcriptTable td::before {
+        content: attr(data-label);
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: var(--ink-muted);
+        flex-shrink: 0;
+      }
+      #transcriptTable td.delete-cell {
+        justify-content: flex-end;
+      }
+      #transcriptTable td.delete-cell::before { content: ""; }
+    }
+
+    /* ---------- 集計・精算 ---------- */
+    .controls-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 0.6rem 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .controls-row label {
+      font-size: 0.85rem;
+      color: var(--ink-muted);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-weight: 600;
+    }
+
+    .controls-row input[type="number"] {
+      width: 64px;
+      padding: 0.4rem;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: inherit;
+    }
+
+    .controls-row select {
+      width: auto;
+    }
+
+    .chart-wrap {
+      position: relative;
+      height: 300px;
+    }
+
+    #settlementResult {
+      font-size: 1rem;
+      padding: 1rem;
+      background: var(--teal-soft);
+      border-radius: var(--radius-md);
+      line-height: 1.6;
+    }
+
+    #settlementResult strong {
+      color: var(--teal-dark);
+    }
+
+    .totals-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      margin-bottom: 1rem;
+      font-size: 0.9rem;
+      color: var(--ink-muted);
+    }
+
+    .totals-row strong {
+      color: var(--ink);
+      font-size: 1.05rem;
+    }
+
+    @media (max-width: 480px) {
+      main { padding: 1rem 0.75rem; }
+      .card { padding: 1rem; border-radius: var(--radius-md); }
+      #header { padding: 0.85rem 1rem 0.6rem; }
+    }
+  </style>
+</head>
+<body>
+  <div id="header">
+    <div class="header-top">
+      <h1>🎙 音声入力家計簿 <span id="status" class="stopped">停止中</span></h1>
+    </div>
+    <div class="tabs">
+      <button class="tab-button active" id="tabBtnInput" onclick="switchView('input')">入力</button>
+      <button class="tab-button" id="tabBtnReport" onclick="switchView('report')">集計・精算</button>
+    </div>
+  </div>
+
+  <main>
+    <!-- ============ 入力ビュー ============ -->
+    <div id="view-input" class="view active">
+      <div class="card">
+        <div class="btn-group">
+          <button class="btn-outline" onclick="startRecognition()">🎤 音声入力開始</button>
+          <button class="btn-outline" onclick="stopRecognition()">⏸ 停止</button>
+          <button class="btn-outline" onclick="confirmEntry()">⏭️ 次</button>
+        </div>
+
+        <textarea id="result" placeholder="音声入力内容がここに表示されます（手動修正可能）"></textarea>
+
+        <div id="notice">
+          <ul>
+            <li>読み上げ項目の順番は問いません</li>
+            <li>「次」ボタンまたは「次」と発声すると1行として確定されます</li>
+            <li>不明な場合は「不明・その他」に分類されます</li>
+            <li>下の一覧で内容を確認・修正してから保存してください</li>
+          </ul>
+        </div>
+      </div>
+
+      <table id="transcriptTable">
+        <thead>
+          <tr>
+            <th>日付</th>
+            <th>金額</th>
+            <th>項目</th>
+            <th>支払者</th>
+            <th>削除</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+
+      <div class="card save-panel">
+        <button class="btn-primary" onclick="saveToSheet()" id="saveButton">☁️ スプレッドシートに保存</button>
+        <div class="save-panel-footer">
+          <span id="saveStatus"></span>
+          <button class="btn-ghost" onclick="downloadCsv()">📥 CSVでダウンロード</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ 集計・精算ビュー ============ -->
+    <div id="view-report" class="view">
+      <div class="card">
+        <div class="controls-row" style="margin-bottom:0;">
+          <button class="btn-outline" onclick="loadReportData()">🔄 最新データを読込</button>
+          <span id="reportStatus" style="color: var(--ink-muted); font-size:0.85rem;"></span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📊 項目別の推移（月次）</h2>
+        <div class="controls-row">
+          <label>表示期間:
+            <select id="trendPeriod" onchange="renderTrendChart()">
+              <option value="6">直近6ヶ月</option>
+              <option value="12" selected>直近12ヶ月</option>
+              <option value="thisyear">今年（1月〜）</option>
+              <option value="all">全期間</option>
+            </select>
+          </label>
+        </div>
+        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h2>🥧 単月の割合</h2>
+        <div class="controls-row">
+          <label>対象月:
+            <select id="monthSelect" onchange="renderMonthPie()"></select>
+          </label>
+        </div>
+        <div class="chart-wrap"><canvas id="monthPieChart"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h2>🤝 割り勘・精算</h2>
+        <div class="controls-row">
+          <label>対象期間:
+            <select id="settlementPeriod" onchange="renderSettlement()">
+              <option value="all">全期間</option>
+              <option value="month">対象月のみ</option>
+            </select>
+          </label>
+          <label>負担割合　瑞穂:
+            <input type="number" id="ratioA" value="50" min="0" max="100" onchange="renderSettlement()">
+          </label>
+          <label>大樹:
+            <input type="number" id="ratioB" value="50" min="0" max="100" onchange="renderSettlement()">
+          </label>
+        </div>
+        <div class="totals-row" id="settlementTotals"></div>
+        <div id="settlementResult">データを読み込んでください。</div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // ↓↓↓ ここをApps Scriptのデプロイ後の exec URL に書き換えてください ↓↓↓
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbycEJyTws-I8pY6KzkTrNGY6fspzTRI4MyEonW4FvkzwWXy31ttH1JV31NY6S1o40Z6bg/exec";
+
+    let recognition;
+    let manualStop = false;
+    let allEntries = [];
+    let trendChart, monthPieChart;
+
+    const CATEGORIES = [
+      "1.家賃", "2.食費", "3.食費(外食)", "4.日用品", "5.水道光熱費",
+      "6.娯楽", "7.家具・家電", "8.冠婚葬祭", "9.医療", "10.子供", "99.不明・その他"
+    ];
+    const NAMES = ["瑞穂", "大樹"];
+    const CATEGORY_KEYWORDS = {
+      "1.家賃": ["家賃", "やちん"],
+      "2.食費": ["食費", "しょくひ", "食料品", "食品"],
+      "3.食費(外食)": ["外食", "がいしょく"],
+      "4.日用品": ["日用品", "にちようひん"],
+      "5.水道光熱費": ["水道光熱費", "水道", "電気代", "電気", "ガス", "光熱費"],
+      "6.娯楽": ["娯楽", "ごらく"],
+      "7.家具・家電": ["家具", "家電", "かぐ", "かでん"],
+      "8.冠婚葬祭": ["冠婚葬祭", "かんこんそうさい"],
+      "9.医療": ["医療", "いりょう", "病院", "薬"],
+      "10.子供": ["子供", "子ども", "こども"],
+      "99.不明・その他": []
+    };
+    const CATEGORY_COLORS = [
+      "#0E7C7B", "#E8734A", "#F2B84B", "#4C9F70", "#7C6FD1",
+      "#D6608C", "#3E8FB0", "#C2410C", "#5B8DEF", "#8CB369", "#9CA3AF"
+    ];
+
+    // ---------- タブ切替 ----------
+    function switchView(view) {
+      document.getElementById('view-input').classList.toggle('active', view === 'input');
+      document.getElementById('view-report').classList.toggle('active', view === 'report');
+      document.getElementById('tabBtnInput').classList.toggle('active', view === 'input');
+      document.getElementById('tabBtnReport').classList.toggle('active', view === 'report');
+      if (view === 'report' && allEntries.length === 0) {
+        loadReportData();
+      }
+    }
+
+    // ---------- 音声入力 ----------
+    function startRecognition() {
+      if (!('webkitSpeechRecognition' in window)) {
+        alert('このブラウザは音声入力（Web Speech API）に対応していません。Chromeでお試しください。');
+        return;
+      }
+      manualStop = false;
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = "ja-JP";
+      recognition.continuous = true;
+      recognition.interimResults = false;
+      document.getElementById("status").textContent = "音声入力中...";
+      document.getElementById("status").className = "listening";
+
+      recognition.onresult = function (event) {
+        const transcript = event.results[event.resultIndex][0].transcript;
+        const resultArea = document.getElementById("result");
+        resultArea.value += transcript + " ";
+
+        if (
+          transcript.includes("つぎ") ||
+          transcript.includes("次") ||
+          transcript.includes("つき") ||
+          transcript.includes("付き")
+        ) {
+          confirmEntry();
+        }
+      };
+
+      recognition.onerror = function (event) {
+        console.error("SpeechRecognition error:", event.error);
+        document.getElementById("status").textContent = "エラー: " + event.error;
+        document.getElementById("status").className = "stopped";
+        if (event.error === "not-allowed" || event.error === "service-not-allowed") {
+          alert("マイクの使用が許可されていません。ブラウザのアドレスバー左側のアイコンからマイクを「許可」にしてください。");
+          manualStop = true;
+        }
+      };
+
+      recognition.onend = function () {
+        if (!manualStop) {
+          // 無音が続くと自動的に止まるため、明示的に止めていなければ再開する
+          try { recognition.start(); } catch (e) { /* 既に開始処理中の場合は無視 */ }
+        } else {
+          document.getElementById("status").textContent = "停止中";
+          document.getElementById("status").className = "stopped";
+        }
+      };
+
+      recognition.start();
+    }
+
+    function stopRecognition() {
+      manualStop = true;
+      if (recognition) {
+        recognition.stop();
+        confirmEntry();
+      }
+    }
+
+    function confirmEntry() {
+      const resultArea = document.getElementById("result");
+      const text = resultArea.value.trim();
+      if (text) {
+        parseAndAddRow(text);
+        resultArea.value = "";
+      }
+    }
+
+    function createCategorySelect(selected) {
+      let select = `<select>`;
+      for (const cat of CATEGORIES) {
+        const selectedAttr = (cat === selected) ? "selected" : "";
+        select += `<option value="${cat}" ${selectedAttr}>${cat}</option>`;
+      }
+      select += `</select>`;
+      return select;
+    }
+
+    function createNameSelect(selected) {
+      let select = `<select>`;
+      for (const name of NAMES) {
+        const selectedAttr = (name === selected) ? "selected" : "";
+        select += `<option value="${name}" ${selectedAttr}>${name}</option>`;
+      }
+      select += `</select>`;
+      return select;
+    }
+
+    function deleteRow(button) {
+      const row = button.closest("tr");
+      row.remove();
+    }
+
+    function formatDateISO(date) {
+      const yyyy = date.getFullYear();
+      const mm = String(date.getMonth() + 1).padStart(2, '0');
+      const dd = String(date.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    function parseAndAddRow(text) {
+      const today = new Date();
+      const firstOfLastMonth = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      const dateString = formatDateISO(firstOfLastMonth);
+
+      let name = "";
+      if (text.includes("瑞穂") || text.includes("みずほ")) {
+        name = "瑞穂";
+      } else if (
+        text.includes("大樹") ||
+        text.includes("ひろき") ||
+        text.includes("弘樹") ||
+        text.includes("博樹") ||
+        text.includes("浩紀") ||
+        text.includes("黄色い")
+      ) {
+        name = "大樹";
+      }
+
+      const numberMatch = text.match(/\d+/g);
+      const amount = numberMatch ? numberMatch[0] : "";
+
+      let category = CATEGORIES.find(cat => {
+        const keywords = CATEGORY_KEYWORDS[cat] || [];
+        return keywords.some(kw => text.includes(kw));
+      });
+
+      if (!category) {
+        category = "99.不明・その他";
+      }
+
+      const table = document.getElementById("transcriptTable").getElementsByTagName('tbody')[0];
+      const newRow = table.insertRow();
+      newRow.insertCell(0).outerHTML = `<td data-label="日付" contenteditable="true">${dateString}</td>`;
+      newRow.insertCell(1).outerHTML = `<td data-label="金額" class="amount" contenteditable="true">${amount}</td>`;
+      const catCell = newRow.insertCell(2);
+      catCell.setAttribute('data-label', '項目');
+      catCell.innerHTML = createCategorySelect(category);
+      const nameCell = newRow.insertCell(3);
+      nameCell.setAttribute('data-label', '支払者');
+      nameCell.innerHTML = createNameSelect(name);
+      newRow.insertCell(4).outerHTML = `<td class="delete-cell"><button class="delete-button" onclick="deleteRow(this)">×</button></td>`;
+
+      newRow.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+
+    function readTableRows() {
+      const table = document.getElementById("transcriptTable");
+      const rows = [];
+      for (const row of table.tBodies[0].rows) {
+        const cells = row.querySelectorAll("td");
+        const date = cells[0].innerText.trim();
+        const amount = cells[1].innerText.trim();
+        const category = cells[2].querySelector("select").value;
+        const name = cells[3].querySelector("select").value;
+        rows.push({ date, amount, category, name });
+      }
+      return rows;
+    }
+
+    function downloadCsv() {
+      const rows = readTableRows();
+      let csv = "日付,金額,項目,支払者\n";
+      rows.forEach(r => {
+        csv += `${r.date},${r.amount},${r.category},${r.name}\n`;
+      });
+
+      const now = new Date();
+      const filename = `${formatDateISO(now).replace(/-/g, '')}_kakeibo.csv`;
+
+      const blob = new Blob(["﻿" + csv], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+    }
+
+    // ---------- スプレッドシートへの保存（Apps Script APIへPOST） ----------
+    function saveToSheet() {
+      const rows = readTableRows();
+      if (rows.length === 0) {
+        alert("保存する行がありません。");
+        return;
+      }
+      const saveButton = document.getElementById("saveButton");
+      const saveStatus = document.getElementById("saveStatus");
+      saveButton.disabled = true;
+      saveStatus.textContent = "保存中...";
+      saveStatus.style.color = "#92400e";
+
+      // Content-Typeを明示しない(text/plainのまま送る)ことでpreflightを回避する
+      fetch(SCRIPT_URL, {
+        method: "POST",
+        body: JSON.stringify({ entries: rows })
+      })
+        .then(res => res.json())
+        .then(res => {
+          if (res.status !== "OK") throw new Error(res.message || "unknown error");
+          saveStatus.textContent = `✅ ${res.count}件を保存しました`;
+          saveStatus.style.color = "#0E7C7B";
+          saveButton.disabled = false;
+          document.getElementById("transcriptTable").getElementsByTagName('tbody')[0].innerHTML = "";
+          allEntries = [];
+        })
+        .catch(err => {
+          saveStatus.textContent = "❌ 保存に失敗しました: " + err.message;
+          saveStatus.style.color = "#C2410C";
+          saveButton.disabled = false;
+        });
+    }
+
+    // ---------- 集計・精算（Apps Script APIからGET） ----------
+    function loadReportData() {
+      const reportStatus = document.getElementById("reportStatus");
+      reportStatus.textContent = "読込中...";
+      fetch(SCRIPT_URL)
+        .then(res => res.json())
+        .then(res => {
+          if (res.status !== "OK") throw new Error(res.message || "unknown error");
+          allEntries = res.entries || [];
+          reportStatus.textContent = `${allEntries.length}件のデータを読み込みました`;
+          populateMonthSelect();
+          try { renderTrendChart(); } catch (e) { console.error("trend chart error", e); }
+          try { renderMonthPie(); } catch (e) { console.error("month pie error", e); }
+          try { renderSettlement(); } catch (e) { console.error("settlement error", e); }
+        })
+        .catch(err => {
+          reportStatus.textContent = "❌ 読込に失敗しました: " + err.message;
+        });
+    }
+
+    function monthKey(dateStr) {
+      const norm = String(dateStr).replace(/\//g, '-');
+      return norm.slice(0, 7);
+    }
+
+    function populateMonthSelect() {
+      const months = Array.from(new Set(allEntries.map(e => monthKey(e.date)))).sort();
+      const select = document.getElementById("monthSelect");
+      const current = select.value;
+      select.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join("");
+      if (months.includes(current)) {
+        select.value = current;
+      } else if (months.length > 0) {
+        select.value = months[months.length - 1];
+      }
+    }
+
+    function renderTrendChart() {
+      let months = Array.from(new Set(allEntries.map(e => monthKey(e.date)))).sort();
+
+      const period = document.getElementById("trendPeriod").value;
+      if (period === "thisyear") {
+        const thisYear = String(new Date().getFullYear());
+        months = months.filter(m => m.startsWith(thisYear));
+      } else if (period !== "all") {
+        const n = Number(period);
+        months = months.slice(-n);
+      }
+
+      const datasets = CATEGORIES.map((cat, i) => {
+        const data = months.map(m =>
+          allEntries
+            .filter(e => monthKey(e.date) === m && e.category === cat)
+            .reduce((sum, e) => sum + Number(e.amount || 0), 0)
+        );
+        return {
+          label: cat.replace(/^\d+\./, ""),
+          data,
+          backgroundColor: CATEGORY_COLORS[i]
+        };
+      }).filter(ds => ds.data.some(v => v > 0));
+
+      const monthTotals = months.map((m, idx) =>
+        datasets.reduce((sum, ds) => sum + (Number(ds.data[idx]) || 0), 0)
+      );
+      const maxTotal = Math.max(0, ...monthTotals);
+
+      const totalLabelPlugin = {
+        id: 'totalLabelPlugin',
+        afterDatasetsDraw(chart) {
+          const meta0 = chart.getDatasetMeta(0);
+          if (!meta0 || !meta0.data || meta0.data.length === 0) return;
+          const { ctx, scales } = chart;
+          months.forEach((m, index) => {
+            const total = monthTotals[index];
+            if (total <= 0) return;
+            const bar = meta0.data[index];
+            if (!bar) return;
+            const x = bar.x;
+            const y = scales.y.getPixelForValue(total);
+            ctx.save();
+            ctx.font = '12px "Noto Sans JP", sans-serif';
+            ctx.fillStyle = '#1E2A32';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText(total.toLocaleString() + '円', x, y - 4);
+            ctx.restore();
+          });
+        }
+      };
+
+      if (trendChart) trendChart.destroy();
+      trendChart = new Chart(document.getElementById("trendChart"), {
+        type: 'bar',
+        data: { labels: months, datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          layout: { padding: { top: 24 } },
+          scales: {
+            x: { stacked: true },
+            y: { stacked: true, beginAtZero: true, suggestedMax: maxTotal * 1.15 }
+          }
+        },
+        plugins: [totalLabelPlugin]
+      });
+    }
+
+    function renderMonthPie() {
+      const month = document.getElementById("monthSelect").value;
+      if (!month) return;
+      const monthEntries = allEntries.filter(e => monthKey(e.date) === month);
+      const totalsByCategory = CATEGORIES.map(cat =>
+        monthEntries.filter(e => e.category === cat).reduce((sum, e) => sum + Number(e.amount || 0), 0)
+      );
+      const labels = [];
+      const data = [];
+      const colors = [];
+      CATEGORIES.forEach((cat, i) => {
+        if (totalsByCategory[i] > 0) {
+          labels.push(cat.replace(/^\d+\./, ""));
+          data.push(totalsByCategory[i]);
+          colors.push(CATEGORY_COLORS[i]);
+        }
+      });
+
+      if (monthPieChart) monthPieChart.destroy();
+      monthPieChart = new Chart(document.getElementById("monthPieChart"), {
+        type: 'doughnut',
+        data: { labels, datasets: [{ data, backgroundColor: colors }] },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
+    }
+
+    function renderSettlement() {
+      const period = document.getElementById("settlementPeriod").value;
+      const month = document.getElementById("monthSelect").value;
+      let target = allEntries;
+      if (period === "month" && month) {
+        target = allEntries.filter(e => monthKey(e.date) === month);
+      }
+
+      const ratioAInput = Number(document.getElementById("ratioA").value) || 0;
+      const ratioBInput = Number(document.getElementById("ratioB").value) || 0;
+      const ratioSum = ratioAInput + ratioBInput;
+
+      const [nameA, nameB] = NAMES;
+      const paidA = target.filter(e => e.name === nameA).reduce((s, e) => s + Number(e.amount || 0), 0);
+      const paidB = target.filter(e => e.name === nameB).reduce((s, e) => s + Number(e.amount || 0), 0);
+      const total = paidA + paidB;
+
+      document.getElementById("settlementTotals").innerHTML =
+        `<div>${nameA} 支払合計<br><strong>${paidA.toLocaleString()}円</strong></div>` +
+        `<div>${nameB} 支払合計<br><strong>${paidB.toLocaleString()}円</strong></div>` +
+        `<div>合計<br><strong>${total.toLocaleString()}円</strong></div>`;
+
+      const resultEl = document.getElementById("settlementResult");
+      if (ratioSum === 0 || total === 0) {
+        resultEl.innerHTML = "対象データがないか、負担割合が0です。";
+        return;
+      }
+
+      const shareA = total * (ratioAInput / ratioSum);
+      const diffA = paidA - shareA;
+
+      if (Math.abs(diffA) < 1) {
+        resultEl.innerHTML = "ちょうど負担割合どおりです。精算の必要はありません。";
+      } else if (diffA > 0) {
+        resultEl.innerHTML =
+          `${nameA}さんが多く払っています。<br>` +
+          `<strong>${nameB} → ${nameA} に ${Math.round(diffA).toLocaleString()}円</strong> を渡すと精算できます。`;
+      } else {
+        resultEl.innerHTML =
+          `${nameB}さんが多く払っています。<br>` +
+          `<strong>${nameA} → ${nameB} に ${Math.round(-diffA).toLocaleString()}円</strong> を渡すと精算できます。`;
+      }
+    }
+  </script>
+</body>
+</html>
