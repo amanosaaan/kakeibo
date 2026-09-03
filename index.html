@@ -652,6 +652,19 @@
       }
     }
 
+    // 手入力（キーボード）でも「つぎ」「次」と入力したら1行として確定する
+    document.getElementById("result").addEventListener("input", function () {
+      const val = this.value;
+      if (
+        val.includes("つぎ") ||
+        val.includes("次") ||
+        val.includes("つき") ||
+        val.includes("付き")
+      ) {
+        confirmEntry();
+      }
+    });
+
     function createCategorySelect(selected) {
       let select = `<select>`;
       for (const cat of CATEGORIES) {
