@@ -473,7 +473,10 @@
         <button class="btn-primary" onclick="saveToSheet()" id="saveButton">☁️ スプレッドシートに保存</button>
         <div class="save-panel-footer">
           <span id="saveStatus"></span>
-          <button class="btn-ghost" onclick="downloadCsv()">📥 CSVでダウンロード</button>
+          <div style="display:flex; flex-wrap:wrap; gap:0.5rem;">
+            <a class="btn-ghost" href="https://docs.google.com/spreadsheets/d/1uM1USUySvw4oS_gC7BE6x1fsU92UOLUmU5PQX8qZOX4/edit" target="_blank" rel="noopener">📊 スプレッドシートを開く</a>
+            <button class="btn-ghost" onclick="downloadCsv()">📥 CSVでダウンロード</button>
+          </div>
         </div>
       </div>
     </div>
