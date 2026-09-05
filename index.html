@@ -509,7 +509,7 @@
         <h2>🥧 単月の割合</h2>
         <div class="controls-row">
           <label>対象月:
-            <select id="monthSelect" onchange="renderMonthPie()"></select>
+            <select id="monthSelect" onchange="onMonthSelectChange()"></select>
           </label>
         </div>
         <div class="totals-row" id="monthPieTotalsRow"></div>
@@ -522,9 +522,8 @@
         <h2>🤝 割り勘・精算</h2>
         <div class="controls-row">
           <label>対象期間:
-            <select id="settlementPeriod" onchange="renderSettlement()">
+            <select id="settlementPeriod" onchange="onSettlementPeriodChange()">
               <option value="all">全期間</option>
-              <option value="month" selected>対象月のみ</option>
             </select>
           </label>
           <label>負担割合　瑞穂:
@@ -867,6 +866,39 @@
       } else if (months.length > 0) {
         select.value = months[months.length - 1];
       }
+
+      const settlementSelect = document.getElementById("settlementPeriod");
+      const settlementCurrent = settlementSelect.value;
+      settlementSelect.innerHTML =
+        `<option value="all">全期間</option>` +
+        months.map(m => `<option value="${m}">${m}</option>`).join("");
+      if (settlementCurrent !== "all" && months.includes(settlementCurrent)) {
+        settlementSelect.value = settlementCurrent;
+      } else if (settlementCurrent === "all") {
+        settlementSelect.value = "all";
+      } else {
+        settlementSelect.value = select.value;
+      }
+    }
+
+    // 「単月の割合」の対象月を変えたら、割り勘・精算側も同じ月に連動させる
+    function onMonthSelectChange() {
+      renderMonthPie();
+      const settlementSelect = document.getElementById("settlementPeriod");
+      if (settlementSelect.value !== "all") {
+        settlementSelect.value = document.getElementById("monthSelect").value;
+      }
+      renderSettlement();
+    }
+
+    // 割り勘・精算側で月を変えたら、「単月の割合」も同じ月に連動させる
+    function onSettlementPeriodChange() {
+      const settlementSelect = document.getElementById("settlementPeriod");
+      if (settlementSelect.value !== "all") {
+        document.getElementById("monthSelect").value = settlementSelect.value;
+        renderMonthPie();
+      }
+      renderSettlement();
     }
 
     function renderTrendChart() {
@@ -1042,10 +1074,9 @@
 
     function renderSettlement() {
       const period = document.getElementById("settlementPeriod").value;
-      const month = document.getElementById("monthSelect").value;
       let target = allEntries;
-      if (period === "month" && month) {
-        target = allEntries.filter(e => monthKey(e.date) === month);
+      if (period !== "all") {
+        target = allEntries.filter(e => monthKey(e.date) === period);
       }
 
       const ratioAInput = Number(document.getElementById("ratioA").value) || 0;
