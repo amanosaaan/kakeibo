@@ -526,6 +526,8 @@
               <option value="all">全期間</option>
             </select>
           </label>
+        </div>
+        <div class="controls-row">
           <label>負担割合　瑞穂:
             <input type="number" id="ratioA" value="50" min="0" max="100" onchange="renderSettlement()">
           </label>
@@ -857,14 +859,15 @@
     }
 
     function populateMonthSelect() {
-      const months = Array.from(new Set(allEntries.map(e => monthKey(e.date)))).sort();
+      // 降順（最新月が先頭）で表示する
+      const months = Array.from(new Set(allEntries.map(e => monthKey(e.date)))).sort().reverse();
       const select = document.getElementById("monthSelect");
       const current = select.value;
       select.innerHTML = months.map(m => `<option value="${m}">${m}</option>`).join("");
       if (months.includes(current)) {
         select.value = current;
       } else if (months.length > 0) {
-        select.value = months[months.length - 1];
+        select.value = months[0];
       }
 
       const settlementSelect = document.getElementById("settlementPeriod");
