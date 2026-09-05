@@ -552,6 +552,7 @@
     let monthPieSelected = new Set();
     let monthPieDataMap = {};
     let trendPeriodInitialized = false;
+    let settlementInitialized = false;
 
     const CATEGORIES = [
       "1.家賃", "2.食費", "3.食費(外食)", "4.日用品", "5.水道光熱費",
@@ -875,10 +876,12 @@
       settlementSelect.innerHTML =
         `<option value="all">全期間</option>` +
         months.map(m => `<option value="${m}">${m}</option>`).join("");
-      if (settlementCurrent !== "all" && months.includes(settlementCurrent)) {
+
+      if (!settlementInitialized) {
+        settlementInitialized = true;
+        settlementSelect.value = select.value; // 初回は最新月をデフォルトにする
+      } else if (settlementCurrent === "all" || months.includes(settlementCurrent)) {
         settlementSelect.value = settlementCurrent;
-      } else if (settlementCurrent === "all") {
-        settlementSelect.value = "all";
       } else {
         settlementSelect.value = select.value;
       }
